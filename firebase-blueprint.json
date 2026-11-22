@@ -1,0 +1,139 @@
+{
+  "entities": {
+    "UserAccountProfile": {
+      "title": "UserAccountProfile",
+      "description": "Authenticated user account metadata, private folder root key, language preference, and security settings.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "folderKey": { "type": "string", "description": "Private folder identifier <AccountName>_<UID>" },
+        "recoveryEmail": { "type": "string", "description": "Optional recovery email address" },
+        "recoveryPhone": { "type": "string", "description": "Optional recovery phone number" },
+        "linkedProviders": { "type": "array", "description": "Connected auth/OAuth providers" },
+        "preferredLanguageCode": { "type": "string", "description": "Selected UI language ISO code" },
+        "biometricEnabled": { "type": "boolean", "description": "Whether device biometric lock is enabled" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on create" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update" }
+      },
+      "required": ["userId", "displayName", "folderKey", "linkedProviders", "preferredLanguageCode", "biometricEnabled", "createdAt", "updatedAt"]
+    },
+    "PrivateFolderItem": {
+      "title": "PrivateFolderItem",
+      "description": "Metadata for an item stored in the user's Firestore Private Folder (<AccountName>_<UID>).",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "folderKey": { "type": "string" },
+        "fileName": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "compressionMethod": {
+          "type": "string",
+          "enum": ["NONE", "PAQ", "ZIP", "GZIP", "ZSTD", "LZ4", "BZIP2", "XZ", "LZMA", "BROTLI", "TAR", "TAR_GZ", "TAR_BZ2", "TAR_XZ", "SEVEN_Z", "DEFLATE"]
+        },
+        "originalSizeBytes": { "type": "integer" },
+        "compressedSizeBytes": { "type": "integer" },
+        "sha256Hash": { "type": "string" },
+        "chunkCount": { "type": "integer" },
+        "category": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "folderKey", "fileName", "mimeType", "compressionMethod", "originalSizeBytes", "compressedSizeBytes", "sha256Hash", "chunkCount", "category", "createdAt", "updatedAt"]
+    },
+    "PrivateFolderChunk": {
+      "title": "PrivateFolderChunk",
+      "description": "Sub-1MiB chunk payload with SHA-256 hash for on-demand download.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "itemId": { "type": "string" },
+        "chunkIndex": { "type": "integer" },
+        "payloadBase64": { "type": "string" },
+        "chunkSha256": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "itemId", "chunkIndex", "payloadBase64", "chunkSha256", "createdAt"]
+    },
+    "CloudPromptPersona": {
+      "title": "CloudPromptPersona",
+      "description": "Synced prompt template or custom AI persona.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "kind": { "type": "string", "enum": ["PROMPT", "PERSONA"] },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "content": { "type": "string" },
+        "preferredLanguageTag": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "kind", "title", "category", "content", "createdAt", "updatedAt"]
+    },
+    "CloudChatBackup": {
+      "title": "CloudChatBackup",
+      "description": "Compact PAQ-compressed chat session backup stored in user's Firestore space.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "modelLabel": { "type": "string" },
+        "messageCount": { "type": "integer" },
+        "paqSummaryBase64": { "type": "string" },
+        "sha256Hash": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "modelLabel", "messageCount", "paqSummaryBase64", "sha256Hash", "createdAt", "updatedAt"]
+    },
+    "SecurityLockRecord": {
+      "title": "SecurityLockRecord",
+      "description": "Salted PBKDF2-HMAC-SHA256 hash and policy metadata for App Lock, Per-Chat Lock, and failed-attempt limits.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "targetType": { "type": "string", "enum": ["APP", "CHAT", "POLICY"] },
+        "targetId": { "type": "string" },
+        "passwordMode": { "type": "string", "enum": ["DIGITS", "LETTERS", "ALPHANUMERIC", "CUSTOM", "PATTERN", "POLICY"] },
+        "patternGridSize": { "type": "integer" },
+        "saltBase64": { "type": "string" },
+        "hashBase64": { "type": "string" },
+        "unlimitedAttempts": { "type": "boolean" },
+        "maxAttempts": { "type": "integer" },
+        "failedAttempts": { "type": "integer" },
+        "lockedOut": { "type": "boolean" },
+        "autoLockTimeoutMillis": { "type": "integer", "description": "Optional background auto-lock timeout in milliseconds (-1 = never, 0 = immediate)" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "targetType", "targetId", "passwordMode", "patternGridSize", "saltBase64", "hashBase64", "unlimitedAttempts", "maxAttempts", "failedAttempts", "lockedOut", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserAccountProfile" },
+      "description": "User profile and private folder root settings."
+    },
+    "/users/{userId}/private_folders/{itemId}": {
+      "schema": { "$ref": "#/entities/PrivateFolderItem" },
+      "description": "Private folder file metadata items."
+    },
+    "/users/{userId}/private_folders/{itemId}/chunks/{chunkId}": {
+      "schema": { "$ref": "#/entities/PrivateFolderChunk" },
+      "description": "Sub-1MiB compressed file chunks for on-demand retrieval."
+    },
+    "/users/{userId}/prompts_personas/{templateId}": {
+      "schema": { "$ref": "#/entities/CloudPromptPersona" },
+      "description": "Synced prompt templates and personas."
+    },
+    "/users/{userId}/chat_backups/{sessionId}": {
+      "schema": { "$ref": "#/entities/CloudChatBackup" },
+      "description": "Compact PAQ-compressed chat history backups."
+    },
+    "/users/{userId}/security_locks/{lockId}": {
+      "schema": { "$ref": "#/entities/SecurityLockRecord" },
+      "description": "Salted PBKDF2 security lock hashes and failure limits for App Lock and Per-Chat locks."
+    }
+  }
+}

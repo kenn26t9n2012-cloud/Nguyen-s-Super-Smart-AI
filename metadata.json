@@ -1,0 +1,6 @@
+{
+  "name": "Super Smart AI",
+  "description": "Trợ lý AI đám mây (Gemini) và ngoại tuyến (GGUF/Vosk/Whisper) tích hợp Code Sandbox, nén PAQ thuần Kotlin, Thư mục Riêng Firestore và trình xuất 72+ định dạng tệp.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,221 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidCompressionMethod(method) {
+      return method in [
+        'NONE', 'PAQ', 'ZIP', 'GZIP', 'ZSTD', 'LZ4', 'BZIP2',
+        'XZ', 'LZMA', 'BROTLI', 'TAR', 'TAR_GZ', 'TAR_BZ2',
+        'TAR_XZ', 'SEVEN_Z', 'DEFLATE'
+      ];
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 60 &&
+             data.folderKey is string && data.folderKey.size() >= 3 && data.folderKey.size() <= 120 &&
+             data.linkedProviders is list && data.linkedProviders.size() <= 15 &&
+             (data.linkedProviders.size() == 0 || data.linkedProviders[0] is string) &&
+             data.preferredLanguageCode is string && data.preferredLanguageCode.size() >= 2 && data.preferredLanguageCode.size() <= 12 &&
+             data.biometricEnabled is bool &&
+             (!('recoveryEmail' in data) || (data.recoveryEmail is string && data.recoveryEmail.size() <= 120)) &&
+             (!('recoveryPhone' in data) || (data.recoveryPhone is string && data.recoveryPhone.size() <= 30)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidPrivateFolderItem(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.folderKey is string && data.folderKey.size() >= 3 && data.folderKey.size() <= 120 &&
+             data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 200 &&
+             data.mimeType is string && data.mimeType.size() >= 1 && data.mimeType.size() <= 100 &&
+             data.compressionMethod is string && isValidCompressionMethod(data.compressionMethod) &&
+             data.originalSizeBytes is int && data.originalSizeBytes >= 0 &&
+             data.compressedSizeBytes is int && data.compressedSizeBytes >= 0 &&
+             data.sha256Hash is string && data.sha256Hash.size() == 64 &&
+             data.chunkCount is int && data.chunkCount >= 0 && data.chunkCount <= 500 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 40 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidPrivateFolderChunk(data, userId, itemId) {
+      return data.userId is string && data.userId == userId &&
+             data.itemId is string && data.itemId == itemId &&
+             data.chunkIndex is int && data.chunkIndex >= 0 && data.chunkIndex <= 500 &&
+             data.payloadBase64 is string && data.payloadBase64.size() >= 1 && data.payloadBase64.size() <= 980000 &&
+             data.chunkSha256 is string && data.chunkSha256.size() == 64 &&
+             data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    function isValidPromptPersona(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.kind is string && data.kind in ['PROMPT', 'PERSONA'] &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 50 &&
+             data.content is string && data.content.size() >= 1 && data.content.size() <= 4000 &&
+             (!('preferredLanguageTag' in data) || (data.preferredLanguageTag is string && data.preferredLanguageTag.size() <= 30)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidChatBackup(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 140 &&
+             data.modelLabel is string && data.modelLabel.size() >= 1 && data.modelLabel.size() <= 80 &&
+             data.messageCount is int && data.messageCount >= 0 &&
+             data.paqSummaryBase64 is string && data.paqSummaryBase64.size() <= 500000 &&
+             data.sha256Hash is string && data.sha256Hash.size() == 64 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidSecurityLock(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.targetType is string && data.targetType in ['APP', 'CHAT', 'POLICY'] &&
+             data.targetId is string && data.targetId.size() >= 1 && data.targetId.size() <= 128 &&
+             data.passwordMode is string && data.passwordMode in ['DIGITS', 'LETTERS', 'ALPHANUMERIC', 'CUSTOM', 'PATTERN', 'POLICY'] &&
+             data.patternGridSize is int && (data.patternGridSize == 0 || (data.patternGridSize >= 3 && data.patternGridSize <= 10)) &&
+             data.saltBase64 is string && data.saltBase64.size() <= 128 &&
+             data.hashBase64 is string && data.hashBase64.size() <= 256 &&
+             data.unlimitedAttempts is bool &&
+             data.maxAttempts is int && data.maxAttempts >= 0 &&
+             data.failedAttempts is int && data.failedAttempts >= 0 &&
+             data.lockedOut is bool &&
+             (!('autoLockTimeoutMillis' in data) || (data.autoLockTimeoutMillis is int && data.autoLockTimeoutMillis >= -1 && data.autoLockTimeoutMillis <= 86400000)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+
+      allow create: if isOwner(userId) && isValidId(userId) &&
+        incoming().keys().hasAll(['userId', 'displayName', 'folderKey', 'linkedProviders', 'preferredLanguageCode', 'biometricEnabled', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['userId', 'displayName', 'folderKey', 'recoveryEmail', 'recoveryPhone', 'linkedProviders', 'preferredLanguageCode', 'biometricEnabled', 'createdAt', 'updatedAt']) &&
+        isValidUserProfile(incoming(), userId);
+
+      allow update: if isOwner(userId) && isValidId(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'folderKey', 'recoveryEmail', 'recoveryPhone', 'linkedProviders', 'preferredLanguageCode', 'biometricEnabled', 'updatedAt']);
+
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      match /private_folders/{itemId} {
+        allow get: if isOwner(userId) && isValidId(itemId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) && isValidId(itemId) &&
+          incoming().keys().hasAll(['userId', 'folderKey', 'fileName', 'mimeType', 'compressionMethod', 'originalSizeBytes', 'compressedSizeBytes', 'sha256Hash', 'chunkCount', 'category', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['userId', 'folderKey', 'fileName', 'mimeType', 'compressionMethod', 'originalSizeBytes', 'compressedSizeBytes', 'sha256Hash', 'chunkCount', 'category', 'createdAt', 'updatedAt']) &&
+          isValidPrivateFolderItem(incoming(), userId);
+
+        allow update: if isOwner(userId) && isValidId(itemId) &&
+          isValidPrivateFolderItem(incoming(), userId) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['folderKey', 'fileName', 'category', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(itemId);
+
+        match /chunks/{chunkId} {
+          allow get: if isOwner(userId) && isValidId(itemId) && isValidId(chunkId);
+          allow list: if isOwner(userId) && isValidId(itemId);
+
+          allow create: if isOwner(userId) && isValidId(itemId) && isValidId(chunkId) &&
+            exists(/databases/$(database)/documents/users/$(userId)/private_folders/$(itemId)) &&
+            incoming().keys().hasAll(['userId', 'itemId', 'chunkIndex', 'payloadBase64', 'chunkSha256', 'createdAt']) &&
+            incoming().keys().hasOnly(['userId', 'itemId', 'chunkIndex', 'payloadBase64', 'chunkSha256', 'createdAt']) &&
+            isValidPrivateFolderChunk(incoming(), userId, itemId);
+
+          allow update: if false;
+          allow delete: if isOwner(userId) && isValidId(itemId) && isValidId(chunkId);
+        }
+      }
+
+      match /prompts_personas/{templateId} {
+        allow get: if isOwner(userId) && isValidId(templateId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) && isValidId(templateId) &&
+          incoming().keys().hasAll(['userId', 'kind', 'title', 'category', 'content', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['userId', 'kind', 'title', 'category', 'content', 'preferredLanguageTag', 'createdAt', 'updatedAt']) &&
+          isValidPromptPersona(incoming(), userId);
+
+        allow update: if isOwner(userId) && isValidId(templateId) &&
+          isValidPromptPersona(incoming(), userId) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['kind', 'title', 'category', 'content', 'preferredLanguageTag', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(templateId);
+      }
+
+      match /chat_backups/{sessionId} {
+        allow get: if isOwner(userId) && isValidId(sessionId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) && isValidId(sessionId) &&
+          incoming().keys().hasAll(['userId', 'title', 'modelLabel', 'messageCount', 'paqSummaryBase64', 'sha256Hash', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['userId', 'title', 'modelLabel', 'messageCount', 'paqSummaryBase64', 'sha256Hash', 'createdAt', 'updatedAt']) &&
+          isValidChatBackup(incoming(), userId);
+
+        allow update: if isOwner(userId) && isValidId(sessionId) &&
+          isValidChatBackup(incoming(), userId) &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'modelLabel', 'messageCount', 'paqSummaryBase64', 'sha256Hash', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(sessionId);
+      }
+
+      match /security_locks/{lockId} {
+        allow get: if isOwner(userId) && isValidId(lockId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) && isValidId(lockId) &&
+          incoming().keys().hasAll(['userId', 'targetType', 'targetId', 'passwordMode', 'patternGridSize', 'saltBase64', 'hashBase64', 'unlimitedAttempts', 'maxAttempts', 'failedAttempts', 'lockedOut', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['userId', 'targetType', 'targetId', 'passwordMode', 'patternGridSize', 'saltBase64', 'hashBase64', 'unlimitedAttempts', 'maxAttempts', 'failedAttempts', 'lockedOut', 'autoLockTimeoutMillis', 'createdAt', 'updatedAt']) &&
+          isValidSecurityLock(incoming(), userId);
+
+        allow update: if isOwner(userId) && isValidId(lockId) &&
+          isValidSecurityLock(incoming(), userId) &&
+          incoming().userId == existing().userId &&
+          incoming().targetType == existing().targetType &&
+          incoming().targetId == existing().targetId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['passwordMode', 'patternGridSize', 'saltBase64', 'hashBase64', 'unlimitedAttempts', 'maxAttempts', 'failedAttempts', 'lockedOut', 'autoLockTimeoutMillis', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(lockId);
+      }
+    }
+  }
+}

@@ -1,0 +1,2 @@
+-keep class com.example.data.cloud.** { *; }
+-keepclassmembers class com.example.data.cloud.** { *; }
